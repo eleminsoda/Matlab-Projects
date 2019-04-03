@@ -25,20 +25,24 @@ set(h2, 'color', 'b', 'linewidth', 1);
 % img1.
 [~,N1] = size(d1);
 [~,N2] = size(d2);
-distance = [];
+distance = zeros(N1,N2);
+
+% Parameter for matching supression
+sigma = 0.7;
+
 for i=1:N1
     for j=1:N2
         subtract = d1(:,i)-d2(:,j);
-        distance(i,j) = norm(subtract);
+        distance(i,j) = norm(double(subtract));
     end
 end 
 
-matchArr=[]
+matchArr = zeros(2,max([N1,N2]));
 for i=1:N1
     subDist = distance(i,:);
     sortDistance = sort(subDist);
-    if(sortDistance(1) < 0.7*sortDistance(2))
-        j=find(distance==sortDistance(1));
+    if(sortDistance(1) < sigma*sortDistance(2))
+        j=find(subDist==sortDistance(1));
         matchArr(1,i) = j;
     end
 end
@@ -46,12 +50,40 @@ end
 for j=1:N2
     subDist = distance(:,j);
     sortDistance = sort(subDist);
-    if(sortDistance(1) < 0.7*sortDistance(2))
-        i=find(distance==sortDistance(1));
+    if(sortDistance(1) < sigma*sortDistance(2))
+        i=find(subDist==sortDistance(1));
         matchArr(2,j) = i;
     end
 end
 
+finalMatchArr = [];
+tempMatchArr = find(matchArr(1,:));
+for i = tempMatchArr
+    colIndex = matchArr(1,i);
+    rowIndex = matchArr(2,colIndex);
+    
+    if rowIndex == i
+        finalMatchArr = [finalMatchArr; [rowIndex, colIndex]];
+    end
+end
+
+% Next we compute the Affine Matrix between two images
+point1 = [];
+point2 = [];
+for i = 1:size(finalMatchArr)
+    pair = finalMatchArr(i,:);
+    point1 = [point1; [f1(1,pair(1)),f1(2,pair(1))]];
+    point2 = [point2; [f2(1,pair(2)),f2(2,pair(2))]];
+end
+
+N = size(point1,1);
+P1 = [point1';ones(1,N)];
+P2 = [point2';ones(1,N)];
+
+H = [];
+H_T = P1'\P2';
+H = H_T';
+H(3,:) = [0 0 1];
 
 
    
