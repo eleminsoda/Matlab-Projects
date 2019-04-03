@@ -94,7 +94,7 @@
     if RightBotCornerCoord(1) > finalRight
         finalRight = floor(RightBotCornerCoord(1));
     end
-    if RightBotCornerCoord(2) > finalBot
+    if RightBotCornerCoord(2) > finalBothelp
         finalBot = floor(RightBotCornerCoord(2));
     end
     
