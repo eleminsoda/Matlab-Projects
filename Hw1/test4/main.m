@@ -1,114 +1,72 @@
 imgColor1 = imread('images\sse1.bmp');
-imgColor2 = imread('images\sse2.bmp');
+imgColor2 = imread('images\sse2.bmp');    
 
-img1_double = double(rgb2gray(imgColor1));
-img2_double = double(rgb2gray(imgColor2));
-
-img1 = single(rgb2gray(imgColor1));
-img2 = single(rgb2gray(imgColor2));
+im1 = double(rgb2gray(imgColor1));
+im2 = double(rgb2gray(imgColor2));
 
 imgColor1 = double(imgColor1);
 imgColor2 = double(imgColor2);
 
-% Compute the SIFT key points as well as the descriptors using vl_sift
-[f1,d1] = vl_sift(img1); 
-[f2,d2] = vl_sift(img2);
+% ====================================
+% ---------------      Find Interest Point    ------------------
+% ====================================
+figure;imshow(im1, []);
+hold on
+sim1 = single(im1);
+[f1,d1] = vl_sift(sim1);
+f1(3, : ) = f1(3, :)*1.5;
+h1 = vl_plotframe(f1(1:3, :));
+set(h1,'color','r','linewidth',1) ;
 
-f1(1:2,:) = uint16(f1(1:2,:));
-f2(1:2,:) = uint16(f2(1:2,:));
+figure;imshow(im2, []);
+hold on
+sim2 = single(im2);
+[f2,d2] = vl_sift(sim2);
+f2(3, : ) = f2(3, :)*1.5;
+h2 = vl_plotframe(f2(1:3, :));
+set(h2,'color','g','linewidth',1) ;
 
-% Plot the key points in both pictures
-figure(1);
-image(uint8(imgColor1));
-h1 = vl_plotframe(f1(1:3,:));
-set(h1, 'color', 'r', 'linewidth', 1);
-
-figure(2);
-imshow(uint8(img2));
-h2 = vl_plotframe(f2(1:3,:));
-set(h2, 'color', 'b', 'linewidth', 1);
-
-% Match the descriptors in both images by computing the Euclidean distance.
-% The match should be a two-way match, that is, the point in img1 matches
-% the point most in img2, and THE point in img2 matches the point most in
-% img1.
-[~,N1] = size(d1);
-[~,N2] = size(d2);
-distance = zeros(N1,N2);
-
-% Parameter for matching supression
-sigma = 0.7;
-
-for i=1:N1
-    for j=1:N2
-        subtract = d1(:,i)-d2(:,j);
-        distance(i,j) = norm(double(subtract));
-    end
-end 
-
-matchArr = zeros(2,max([N1,N2]));
-for i=1:N1
-    subDist = distance(i,:);
-    sortDistance = sort(subDist);
-    if(sortDistance(1) < sigma*sortDistance(2))
-        j=find(subDist==sortDistance(1));
-        matchArr(1,i) = j;
-    end
+% ====================================
+% ---------------      Match Discriptors     ------------------
+% ====================================
+[matches, scores] = vl_ubcmatch(d1, d2);
+correspondRes = [matches; scores]';
+correspondRes = sortrows(correspondRes, 3);
+correspondRes = correspondRes';
+matches = correspondRes(1:2, 1:100 );
+m1 = zeros(2, size(matches, 2));
+m2 = zeros(2, size(matches, 2));
+for i = 1:size(matches, 2)
+    m1(1:2,i) = int32(f1(1:2,matches(1, i)));
+    m2(1:2,i) = int32(f2(1:2,matches(2, i)));
 end
 
-for j=1:N2
-    subDist = distance(:,j);
-    sortDistance = sort(subDist);
-    if(sortDistance(1) < sigma*sortDistance(2))
-        i=find(subDist==sortDistance(1));
-        matchArr(2,j) = i;
-    end
-end
+% ====================================
+% ---------------      Rancac & Solve H     ------------------
+% ====================================
+x1 = [m1(2,:); m1(1,:); ones(1,length(m1))];
+x2 = [m2(2,:); m2(1,:); ones(1,length(m1))];    
+t = 0.005;  
+[H, inliers] = ransacfithomography(x1, x2, t);
 
-finalMatchArr = [];
-tempMatchArr = find(matchArr(1,:));
-for i = tempMatchArr
-    colIndex = matchArr(1,i);
-    rowIndex = matchArr(2,colIndex);
-    
-    if rowIndex == i
-        finalMatchArr = [finalMatchArr; [rowIndex, colIndex]];
-    end
-end
-
-% Next we use RANSAC to filter the key points and compute the Affine Matrix
-% between two images using ransanfithomography. Note that the rows and cols
-% should be reversed.
-point1 = [];
-point2 = [];
-for i = 1:size(finalMatchArr)
-    pair = finalMatchArr(i,:);
-    point1 = [point1; [f1(1,pair(1)),f1(2,pair(1))]];
-    point2 = [point2; [f2(1,pair(2)),f2(2,pair(2))]];
-end
-
-point1 = point1';
-point2 = point2';
-N = size(point1,2);
-P1 = [point1;ones(1,N)];
-P2 = [point2;ones(1,N)];
-
-t = 0.005;  % Distance threshold for deciding outliers
-[H, inliers] = ransacfithomography(P1, P2, t);
-
-inliers1 = point1(:,inliers);
-inliers2 = point2(:,inliers);
+% ====================================
+% -----------      Display Discriptors' Match    -------------
+% ====================================
+inliers1 = m1(:,inliers);
+inliers2 = m2(:,inliers);
 m1 = inliers1';
 m2 = inliers2';
 x = 1:length(m2);
 corr = [x' x'];
+DisplayPoreCorr(im1, im2, m1, m2, corr);
 
-DisplayPoreCorr(img1_double, img2_double, m1, m2, corr);
+% ====================================
+% -----------      Merge two Images with H    -------------
+% ====================================
+InverseOfH = inv(H); 
 
-% Finally we stitch two images 
-InverseOfH = inv(H);
-[rowsIm1, colsIm1] = size(img1_double);
-[rowsIm2, colsIm2] = size(img2_double);
+[rowsIm1, colsIm1] = size(im1); 
+[rowsIm2, colsIm2] = size(im2);
 finalLeft = 1;
 finalRight = colsIm2;
 finalTop = 1;
@@ -199,3 +157,22 @@ end
 
 transformedImage(-finalTop + 2 : -finalTop + 1 + rowsIm2, -finalLeft + 2 : -finalLeft + 1 + colsIm2,:) = imgColor2;
 figure;imshow(uint8(transformedImage),[]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

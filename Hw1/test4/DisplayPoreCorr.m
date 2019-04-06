@@ -19,14 +19,14 @@ im(1:rows2, cols1+4:cols) = im2;
 pp1 = pores1(corr(:, 1), 1:2);
 pp2 = pores2(corr(:, 2), 1:2);
  
-pp2(:, 2) = pp2(:, 2) + cols1 + 3;
+pp2(:, 1) = pp2(:, 1) + cols1 + 3;
  
 figure;imshow(im,[]);
 hold on
 for i = 1:size(corr, 1)
-    y1 = pp1(i, 1);
-    x1 = pp1(i, 2);
-    plot(x1, y1, 'Marker', 'o', 'MarkerEdgeColor', 'r', 'MarkerSize', 5);
+    x1 = pp1(i, 1);
+    y1 = pp1(i, 2);
+    plot(x1, y1, 'Marker', 'o', 'MarkerEdgeColor', 'b', 'MarkerSize', 5);
     xt = x1;
     yt = y1;
     while mask(yt, xt) ~= 0
@@ -38,9 +38,9 @@ for i = 1:size(corr, 1)
     end
     %text(xt, yt, num2str(i), 'color', 'b');
     mask(yt, xt) = 1;
-    y2 = pp2(i, 1);
-    x2 = pp2(i, 2);
-    plot(x2, y2, 'Marker', 'o', 'MarkerEdgeColor', 'r', 'MarkerSize', 5);
+    x2 = pp2(i, 1);
+    y2 = pp2(i, 2);
+    plot(x2, y2, 'Marker', 'o', 'MarkerEdgeColor', 'b', 'MarkerSize', 5);
     xt = x2;
     yt = y2;
     while mask(yt, xt) ~= 0
@@ -52,6 +52,6 @@ for i = 1:size(corr, 1)
     end
     %text(xt, yt, num2str(i), 'color', 'b');
     mask(yt, xt) = 1;
-    line([x1, x2], [y1, y2], 'Color', 'y');
+    line([x1, x2], [y1, y2], 'Color', 'g');
 end
 hold off
