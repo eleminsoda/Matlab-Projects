@@ -8,34 +8,72 @@ sample_size = size(samples, 1);
 theta = 0.5;
 
 % generate the weak classifiers
-classifier_count = 0;
 total_count = 5;
+weak_classifiers = [];
 
-for classifier_count = 1:total_count
+weak_classifiers = generate_weak_classifier(total_count, samples, theta)
 
-end
+% combine the weak classifiers using Adaboost
+weight = ones(1, total_count) / total_count
 
-function limit = generate_weak_classifier(mode)
-    qualified = 0;
+function limit = generate_weak_classifier(total_count, samples, theta)
+    x_list = sort(samples(:, 1));
+    y_list = sort(samples(:, 2));
+    x_index = 1;
+    y_index = 1;
 
-    while (~qualified)
-        limit = rand(1) * sample_size;
-        error_count = 0;
+    classifier_count = 0;
+    orientation = 1;
 
-        for i = 1:sample_size
+    while classifier_count < total_count
+        qualified = 0;
 
-            if (samples(i, mode) > limit) && (samples(i, 3) ~= 1)
-                error_count = error_count + 1;
+        while (~qualified)
+
+            if orientation == 1 && x_index >= size(samples, orientation)
+                break;
             end
 
-            if (samples(i, mode) < limit) && (samples(i, 3) ~= -1)
-                error_count = error_count + 1;
+            if orientation == 2 && y_index >= size(samples, orientation)
+                break;
+            end
+
+            limit = x_list(x_index) + 1;
+            error_count = 0;
+
+            for i = 1:size(samples, 1)
+
+                if (samples(i, orientation) > limit) && (samples(i, 3) ~= 1)
+                    error_count = error_count + 1;
+                end
+
+                if (samples(i, orientation) < limit) && (samples(i, 3) ~= -1)
+                    error_count = error_count + 1;
+                end
+
+            end
+
+            if error_count < round(theta * size(samples, 1))
+                qualified = 1;
+                classifier_count = classifier_count + 1;
+            end
+
+            if orientation == 1
+                x_index = x_index + 1;
+            end
+
+            if orientation == 2
+                y_index = y_index + 1;
             end
 
         end
 
-        if error_count < theta * sample_size
-            qualified = 1;
+        if orientation == 1
+            orientation = 2;
+        end
+
+        if orientation == 2
+            orientation = 1;
         end
 
     end
