@@ -43,35 +43,84 @@ weak_classifiers = generate_weak_classifier(samples, theta);
 weak_classifiers = sortrows(weak_classifiers, 3);
 
 % combine the weak classifiers using Adaboost
-weight = ones(1, total_count) / total_count;
+weights = ones(1, sample_size) / sample_size;
 
-correct_classify = 0; % if the classifiers can classify the points correctly
+correct_classify = []; % if the classifiers can classify the points correctly
 classifier_index = 1;
 alphas = [];
 
-while ~correct_classify
-    error_rate = weak_classifiers(classifier_index, 3) / sample_size;
+while 1
+    error_rate = 0;
+    [classifier_index, error_rate] = find_best_weak_classifier(weak_classifiers, weights, samples);
+
     alpha = 0.5 * log((1 - error_rate) / error_rate);
     alphas = [alphas; alpha];
 
-    correct_classify = check_correct_classify(weak_classifiers, alphas, samples)
+    correct_classify = check_correct_classify(weak_classifiers(classifier_index), samples);
+
+    if ~(ismember(-1, correct_classify))% already able to classify all points correctly
+        break
+    end
+
+    weights = update_samples_weights(samples, alpha, weights, correct_classify);
 
 end
 
-function can_classify = check_correct_classify(weak_classifiers, alphas, samples)
+function [index, error_rate] = find_best_weak_classifier(weak_classifiers, weights, samples)
+    index = 0;
+    error_rate = 10000;
 
-    can_classify = 1;
-
-    for point = samples
+    for i = 1:size(weak_classifiers, 1)
         temp = 0;
+        can_classify = check_correct_classify(weak_classifiers(i,:), samples);
 
-        for i = 1:length(alphas)
-            temp = temp + alphas(i) * sgn(point(weak_classifiers(i, 1)), ...
-                weak_classifiers(i, 2), weak_classifiers(i, 4));
+        for index = 1:length(weights)
+
+            if can_classify(index) == -1
+                temp = temp + weights(index);
+            end
+
         end
 
-        if temp * point(3) > 0
-            can_classify = 0;
+        if temp < error_rate
+            error_rate = temp;
+            index = i;
+
+        end
+
+    end
+
+end
+
+function weights = update_samples_weights(samples, alpha, weights, correct_classify)
+
+    for i = 1:size(samples, 1)
+        weights(i) = weights(i) * exp(-1 * alpha, correct_classify(i));
+    end
+
+    total = sum(weights)
+
+    for i = 1:length(weights)
+        weights(i) = weights(i) / total;
+    end
+
+end
+
+% check if the current classifier can classify the points correctly
+function correct_classify = check_correct_classify(weak_classifier, samples)
+
+    correct_classify = [];
+
+    for point = samples'
+        temp = 0;
+
+        temp = sgn(point(weak_classifier(1)), ...
+            weak_classifier(2), weak_classifier(4));
+
+        if temp * point(3) < 0
+            correct_classify = [correct_classify; -1];
+        else
+            correct_classify = [correct_classify; 1];
         end
 
     end
@@ -82,6 +131,8 @@ function output = sgn(a, limit, reversed)
 
     if a < limit
         output = -1 * reversed;
+    elseif a == limit
+        output = 0;
     else
         output = 1 * reversed;
     end
@@ -141,7 +192,7 @@ function limits = generate_weak_classifier(samples, theta)
             if error_count < round(theta * size(samples, 1))
                 qualified = 1;
                 classifier_count = classifier_count + 1;
-                limits = [limits; orientation, limit, error_count, positive_or_negative];
+                limits = [limits; orientation, limit, error_count / size(samples, 1), positive_or_negative];
             end
 
             indexes(orientation) = indexes(orientation) + 1;
