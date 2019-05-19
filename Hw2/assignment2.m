@@ -40,49 +40,79 @@ weak_classifiers = [];
 % hold off;
 
 weak_classifiers = generate_weak_classifier(samples, theta);
-weak_classifiers = sortrows(weak_classifiers, 3);
+% weak_classifiers = sortrows(weak_classifiers, 3);
 
 % combine the weak classifiers using Adaboost
 weights = ones(1, sample_size) / sample_size;
 
 correct_classify = []; % if the classifiers can classify the points correctly
 classifier_index = 1;
+classifier_indexes = [];
 alphas = [];
+finished = 0;
 
-while 1
+while ~finished
     error_rate = 0;
-    [classifier_index, error_rate] = find_best_weak_classifier(weak_classifiers, weights, samples);
+    [classifier_index, error_rate] = find_best_weak_classifier(weak_classifiers, weights, samples, classifier_indexes);
 
     alpha = 0.5 * log((1 - error_rate) / error_rate);
     alphas = [alphas; alpha];
+    classifier_indexes = [classifier_indexes; classifier_index];
 
-    correct_classify = check_correct_classify(weak_classifiers(classifier_index), samples);
+    indicators = zeros(1, size(samples, 1));
 
-    if ~(ismember(-1, correct_classify))% already able to classify all points correctly
-        break
+    for i = 1:length(alphas)
+
+        correct_classify = check_correct_classify(weak_classifiers(classifier_indexes(i), :), samples);
+
+        for j = 1:size(samples, 1)
+            indicators(j) = indicators(j) + correct_classify(j) / samples(j, 3) * alphas(i);
+        end
+
+    end
+
+    for i = 1:length(indicators)
+        indicators(i) = sgn(indicators(i), 0, 1);
+    end
+
+    temp = 1;
+
+    for i = 1:length(indicators)
+
+        if indicators(i) ~= samples(i, 3)
+            temp = 0;
+            break;
+        end
+
+    end
+
+    if temp
+        finished = 1;
+        disp(alphas);
+        disp(classifier_indexes);
     end
 
     weights = update_samples_weights(samples, alpha, weights, correct_classify);
 
 end
 
-function [index, error_rate] = find_best_weak_classifier(weak_classifiers, weights, samples)
+function [index, error_rate] = find_best_weak_classifier(weak_classifiers, weights, samples, classifier_indexes)
     index = 0;
     error_rate = 10000;
 
     for i = 1:size(weak_classifiers, 1)
         temp = 0;
-        can_classify = check_correct_classify(weak_classifiers(i,:), samples);
+        can_classify = check_correct_classify(weak_classifiers(i, :), samples);
 
-        for index = 1:length(weights)
+        for j = 1:length(weights)
 
-            if can_classify(index) == -1
-                temp = temp + weights(index);
+            if can_classify(j) == -1
+                temp = temp + weights(j);
             end
 
         end
 
-        if temp < error_rate
+        if (temp < error_rate) && (~ismember(i, classifier_indexes))
             error_rate = temp;
             index = i;
 
@@ -95,10 +125,10 @@ end
 function weights = update_samples_weights(samples, alpha, weights, correct_classify)
 
     for i = 1:size(samples, 1)
-        weights(i) = weights(i) * exp(-1 * alpha, correct_classify(i));
+        weights(i) = weights(i) * exp(-1 * alpha * correct_classify(i));
     end
 
-    total = sum(weights)
+    total = sum(weights);
 
     for i = 1:length(weights)
         weights(i) = weights(i) / total;
